@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>모비 타이머</title>
+    <style>
+      body { width: 320px; margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+      .wrap { padding: 12px; }
+      .title { font-weight: 900; font-size: 14px; }
+      .muted { color: #666; font-size: 12px; }
+      .row { margin-top: 10px; display: grid; gap: 6px; }
+      select, input[type="checkbox"] { font-size: 13px; }
+      select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 10px; }
+      .time { margin-top: 10px; font-size: 34px; font-weight: 900; letter-spacing: .5px; }
+      .btns { display: flex; gap: 8px; margin-top: 10px; }
+      button { flex: 1; padding: 10px; border-radius: 12px; border: 1px solid #ccc; background: #fff; cursor: pointer; font-weight: 700; }
+      button.primary { border-color: #111; }
+      .hr { margin: 12px 0; height: 1px; background: #eee; }
+      .inline { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+      .pill { font-size: 12px; padding: 2px 8px; border: 1px solid #ddd; border-radius: 999px; }
+      a { color: inherit; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="title">모비 타이머</div>
+      <div class="muted">각성시간을 철저히 지켜 극딜을 박자</div>
+
+      <div class="row">
+        <div class="muted">엠블럼 룬 선택</div>
+        <select id="rune"></select>
+      </div>
+
+      <div class="row">
+        <div class="inline">
+          <label class="muted" for="prophetEnabled">눈 먼 예언자 적용</label>
+          <input id="prophetEnabled" type="checkbox" />
+        </div>
+        <select id="prophetLevel">
+          <option value="0">0 초월 (쿨타임 감소 38s)</option>
+          <option value="1">1 초월 (쿨타임 감소 39s)</option>
+          <option value="2">2 초월 (쿨타임 감소 40s)</option>
+        </select>
+        <div class="inline">
+          <div class="muted">적용 쿨타임</div>
+          <div class="pill" id="effCd">-</div>
+        </div>
+      </div>
+
+      <div class="time" id="time">--:--</div>
+      <div class="muted" id="state">State: -</div>
+
+      <div class="btns">
+        <button class="primary" id="start">Start</button>
+        <button id="stop">Stop</button>
+      </div>
+
+      <div class="btns">
+        <button id="toggleOverlay">오버레이 켜기</button>
+        <button id="openOptions">Options</button>
+      </div>
+
+      <div class="hr"></div>
+      <div class="muted">
+        타이머
+      </div>
+    </div>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

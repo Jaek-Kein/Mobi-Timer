@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "Awakening Rune Timer",
+  "version": "0.3.1",
+  "description": "m-inbody.info dashboard rune counter watcher with cooldown overlay timer.",
+  "permissions": ["storage", "tabs", "scripting"],
+  "host_permissions": ["https://m-inbody.info/*"],
+  "action": {
+    "default_title": "Awakening Timer",
+    "default_popup": "popup.html"
+  },
+  "options_page": "options.html",
+  "content_scripts": [
+    {
+      "matches": ["https://m-inbody.info/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle",
+      "all_frames": true
+    }
+  ]
+}
