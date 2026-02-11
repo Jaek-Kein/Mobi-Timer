@@ -83,6 +83,7 @@ function formatMMSS(sec) {
     const timeEl = document.getElementById("time");
     const stateEl = document.getElementById("state");
     const toggleOverlayBtn = document.getElementById("toggleOverlay");
+    const togglePipBtn = document.getElementById("togglePip");
 
     function getRuneNames() {
         const names = Object.keys(cfg?.runes ?? {});
@@ -117,7 +118,7 @@ function formatMMSS(sec) {
             return;
         }
         const st = r.res;
-        stateEl.textContent = `State: ${st.running ? "Running" : "Idle"} / Overlay: ${st.overlayVisible ? "ON" : "OFF"}`;
+        stateEl.textContent = `State: ${st.running ? "Running" : "Idle"} / Overlay: ${st.overlayVisible ? "ON" : "OFF"} / PiP: ${st.pipActive ? "ON" : "OFF"}`;
         timeEl.textContent = formatMMSS(st.remainingSec);
     }
 
@@ -167,6 +168,21 @@ function formatMMSS(sec) {
         });
         if (!r.ok) stateEl.textContent = `State: ${r.reason}`;
         refreshUI();
+        await refreshState();
+    });
+
+    togglePipBtn.addEventListener("click", async () => {
+        const r = await sendToDashboard({ type: "TOGGLE_PIP" });
+        if (!r.ok) {
+            stateEl.textContent = `State: ${r.reason}`;
+            return;
+        }
+        if (!r.res?.ok) {
+            stateEl.textContent = `State: ${r.res?.reason || "PiP toggle failed"}`;
+            return;
+        }
+        const pipState = r.res.active ? "ON" : "OFF";
+        stateEl.textContent = `State: PiP ${pipState}`;
         await refreshState();
     });
 

@@ -54,6 +54,8 @@ let __awakenMissingSinceMs = 0;
 let __awakenDragging = false;
 let __awakenDragOffsetX = 0;
 let __awakenDragOffsetY = 0;
+let __awakenPipWindow = null;
+let __awakenPipSyncTimer = null;
 
 function formatMMSS(sec) {
     if (sec == null) return "--:--";
@@ -173,6 +175,128 @@ function renderOverlay() {
     const reasonEl = document.getElementById("__awaken_reason");
     if (timeEl) timeEl.textContent = formatMMSS(remainingSec);
     if (reasonEl) reasonEl.textContent = running ? lastReason : "";
+    renderPipOverlay();
+}
+
+function hasDocumentPip() {
+    return typeof window.documentPictureInPicture?.requestWindow === "function";
+}
+
+function renderPipOverlay() {
+    if (!__awakenPipWindow || __awakenPipWindow.closed) return;
+    const doc = __awakenPipWindow.document;
+    if (!doc) return;
+
+    const timeEl = doc.getElementById("__awaken_pip_time");
+    const reasonEl = doc.getElementById("__awaken_pip_reason");
+    const stateEl = doc.getElementById("__awaken_pip_state");
+    if (timeEl) timeEl.textContent = formatMMSS(remainingSec);
+    if (reasonEl) reasonEl.textContent = running ? lastReason : "";
+    if (stateEl) stateEl.textContent = running ? "Running" : "Idle";
+}
+
+function stopPipSync() {
+    if (__awakenPipSyncTimer) clearInterval(__awakenPipSyncTimer);
+    __awakenPipSyncTimer = null;
+}
+
+function buildPipDocument(win) {
+    const doc = win.document;
+    doc.head.innerHTML = `
+      <meta charset="utf-8">
+      <title>Awakening Timer PiP</title>
+      <style>
+        html, body {
+          margin: 0;
+          width: 100%;
+          height: 100%;
+          background: rgba(18,18,18,0.95);
+          color: #fff;
+          font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        }
+        .wrap {
+          box-sizing: border-box;
+          width: 100%;
+          height: 100%;
+          padding: 14px 16px;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          align-items: center;
+          text-align: center;
+          gap: 6px;
+        }
+        .title { font-size: 18px; opacity: 0.72; }
+        .time { font-size: 44px; line-height: 1.1; font-weight: 800; }
+        .reason {
+          font-size: 16px;
+          opacity: 0.78;
+          max-width: 100%;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .state { font-size: 12px; opacity: 0.6; }
+      </style>
+    `;
+    doc.body.innerHTML = `
+      <div class="wrap">
+        <div class="title">쿨타임</div>
+        <div class="time" id="__awaken_pip_time">--:--</div>
+        <div class="reason" id="__awaken_pip_reason"></div>
+        <div class="state" id="__awaken_pip_state">Idle</div>
+      </div>
+    `;
+}
+
+async function openPipOverlay() {
+    if (!hasDocumentPip()) {
+        return {
+            ok: false,
+            reason: "Document PiP is not supported in this browser.",
+        };
+    }
+    if (__awakenPipWindow && !__awakenPipWindow.closed) {
+        renderPipOverlay();
+        return { ok: true, active: true };
+    }
+
+    const pipWindow = await window.documentPictureInPicture.requestWindow({
+        width: 300,
+        height: 200,
+    });
+    __awakenPipWindow = pipWindow;
+    buildPipDocument(pipWindow);
+    pipWindow.addEventListener("pagehide", () => {
+        stopPipSync();
+        __awakenPipWindow = null;
+    });
+
+    stopPipSync();
+    __awakenPipSyncTimer = setInterval(renderPipOverlay, 250);
+    renderPipOverlay();
+    return { ok: true, active: true };
+}
+
+function closePipOverlay() {
+    if (!__awakenPipWindow || __awakenPipWindow.closed) {
+        __awakenPipWindow = null;
+        stopPipSync();
+        return { ok: true, active: false };
+    }
+
+    const pipWindow = __awakenPipWindow;
+    __awakenPipWindow = null;
+    stopPipSync();
+    pipWindow.close();
+    return { ok: true, active: false };
+}
+
+async function togglePipOverlay() {
+    if (__awakenPipWindow && !__awakenPipWindow.closed) {
+        return closePipOverlay();
+    }
+    return openPipOverlay();
 }
 
 function startTimer(reason = "Count increased") {
@@ -365,7 +489,14 @@ chrome.storage.onChanged.addListener((changes, area) => {
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     try {
         if (message?.type === "GET_STATE") {
-            sendResponse({ running, remainingSec, overlayVisible });
+            sendResponse({
+                running,
+                remainingSec,
+                overlayVisible,
+                pipActive: Boolean(
+                    __awakenPipWindow && !__awakenPipWindow.closed
+                ),
+            });
             return;
         }
 
@@ -385,6 +516,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             setOverlayVisible(Boolean(message.visible));
             sendResponse({ ok: true });
             return;
+        }
+
+        if (message?.type === "TOGGLE_PIP") {
+            togglePipOverlay()
+                .then((res) => sendResponse(res))
+                .catch((err) =>
+                    sendResponse({
+                        ok: false,
+                        reason: String(err?.message || err),
+                    })
+                );
+            return true;
         }
 
         sendResponse({ ok: false, reason: "Unknown message" });
@@ -420,4 +563,3 @@ setInterval(() => {
     __awakenTryAttachSelectedRune();
     __awakenStartRootObserver();
 })();
-
