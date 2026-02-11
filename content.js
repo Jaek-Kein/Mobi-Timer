@@ -56,6 +56,9 @@ let __awakenDragOffsetX = 0;
 let __awakenDragOffsetY = 0;
 let __awakenPipWindow = null;
 let __awakenPipSyncTimer = null;
+const PIP_SCALE = 0.75;
+const PIP_BASE_WIDTH = 180;
+const PIP_BASE_HEIGHT = 110;
 
 function formatMMSS(sec) {
     if (sec == null) return "--:--";
@@ -91,10 +94,29 @@ function getOrCreateOverlay() {
     <div id="__awaken_title" style="font-size:22px;opacity:0.75;">쿨타임</div>
     <div id="__awaken_time" style="font-size:48px;font-weight:800;line-height:1.15;">--:--</div>
     <div id="__awaken_reason" style="font-size:20px;opacity:0.75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
+    <button id="__awaken_pip_btn" type="button" style="margin-top:12px;padding:6px 10px;border:1px solid rgba(255,255,255,0.28);border-radius:10px;background:rgba(255,255,255,0.08);color:#fff;font-size:13px;cursor:pointer;">PiP OFF</button>
   `;
     box.addEventListener("mousedown", onOverlayMouseDown);
+    const pipBtn = box.querySelector("#__awaken_pip_btn");
+    if (pipBtn) {
+        pipBtn.addEventListener("mousedown", (e) => e.stopPropagation());
+        pipBtn.addEventListener("click", async (e) => {
+            e.stopPropagation();
+            const btn = e.currentTarget;
+            if (!btn || btn.disabled) return;
+            btn.disabled = true;
+            try {
+                await togglePipOverlay();
+            } catch (_) {
+            } finally {
+                btn.disabled = false;
+                syncOverlayPipButton();
+            }
+        });
+    }
     document.documentElement.appendChild(box);
     applyOverlayPosition();
+    syncOverlayPipButton();
     return box;
 }
 
@@ -175,11 +197,29 @@ function renderOverlay() {
     const reasonEl = document.getElementById("__awaken_reason");
     if (timeEl) timeEl.textContent = formatMMSS(remainingSec);
     if (reasonEl) reasonEl.textContent = running ? lastReason : "";
+    syncOverlayPipButton();
     renderPipOverlay();
 }
 
 function hasDocumentPip() {
     return typeof window.documentPictureInPicture?.requestWindow === "function";
+}
+
+function syncOverlayPipButton() {
+    const btn = document.getElementById("__awaken_pip_btn");
+    if (!btn) return;
+    if (!hasDocumentPip()) {
+        btn.textContent = "PiP N/A";
+        btn.disabled = true;
+        btn.style.opacity = "0.5";
+        btn.style.cursor = "not-allowed";
+        return;
+    }
+    const active = Boolean(__awakenPipWindow && !__awakenPipWindow.closed);
+    btn.textContent = active ? "PiP ON" : "PiP OFF";
+    btn.disabled = false;
+    btn.style.opacity = "1";
+    btn.style.cursor = "pointer";
 }
 
 function renderPipOverlay() {
@@ -188,11 +228,7 @@ function renderPipOverlay() {
     if (!doc) return;
 
     const timeEl = doc.getElementById("__awaken_pip_time");
-    const reasonEl = doc.getElementById("__awaken_pip_reason");
-    const stateEl = doc.getElementById("__awaken_pip_state");
     if (timeEl) timeEl.textContent = formatMMSS(remainingSec);
-    if (reasonEl) reasonEl.textContent = running ? lastReason : "";
-    if (stateEl) stateEl.textContent = running ? "Running" : "Idle";
 }
 
 function stopPipSync() {
@@ -218,33 +254,22 @@ function buildPipDocument(win) {
           box-sizing: border-box;
           width: 100%;
           height: 100%;
-          padding: 14px 16px;
+          padding: 10px 12px;
           display: flex;
           flex-direction: column;
           justify-content: center;
           align-items: center;
           text-align: center;
-          gap: 6px;
+          gap: 4px;
         }
-        .title { font-size: 18px; opacity: 0.72; }
-        .time { font-size: 44px; line-height: 1.1; font-weight: 800; }
-        .reason {
-          font-size: 16px;
-          opacity: 0.78;
-          max-width: 100%;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-        .state { font-size: 12px; opacity: 0.6; }
+        .title { font-size: 14px; opacity: 0.72; }
+        .time { font-size: 33px; line-height: 1.1; font-weight: 800; }
       </style>
     `;
     doc.body.innerHTML = `
       <div class="wrap">
         <div class="title">쿨타임</div>
         <div class="time" id="__awaken_pip_time">--:--</div>
-        <div class="reason" id="__awaken_pip_reason"></div>
-        <div class="state" id="__awaken_pip_state">Idle</div>
       </div>
     `;
 }
@@ -262,14 +287,16 @@ async function openPipOverlay() {
     }
 
     const pipWindow = await window.documentPictureInPicture.requestWindow({
-        width: 300,
-        height: 200,
+        width: Math.round(PIP_BASE_WIDTH * PIP_SCALE),
+        height: Math.round(PIP_BASE_HEIGHT * PIP_SCALE),
     });
     __awakenPipWindow = pipWindow;
+    syncOverlayPipButton();
     buildPipDocument(pipWindow);
     pipWindow.addEventListener("pagehide", () => {
         stopPipSync();
         __awakenPipWindow = null;
+        syncOverlayPipButton();
     });
 
     stopPipSync();
@@ -282,6 +309,7 @@ function closePipOverlay() {
     if (!__awakenPipWindow || __awakenPipWindow.closed) {
         __awakenPipWindow = null;
         stopPipSync();
+        syncOverlayPipButton();
         return { ok: true, active: false };
     }
 
@@ -289,6 +317,7 @@ function closePipOverlay() {
     __awakenPipWindow = null;
     stopPipSync();
     pipWindow.close();
+    syncOverlayPipButton();
     return { ok: true, active: false };
 }
 
